@@ -5,12 +5,12 @@
  * @category MultiSafepay
  * @package  MultiSafepay_Msp
  */
-class MultiSafepay_Msp_Model_Gateway_Klarna extends MultiSafepay_Msp_Model_Gateway_Abstract {
+class MultiSafepay_Msp_Model_Gateway_Einvoice extends MultiSafepay_Msp_Model_Gateway_Abstract {
 
-    protected $_code = "msp_klarna";
-    public $_model = "klarna";
-    public $_gateway = "KLARNA";
-    protected $_formBlockType = 'msp/klarna';
+    protected $_code = "msp_einvoice";
+    public $_model = "einvoice";
+    public $_gateway = "EINVOICE";
+   // protected $_formBlockType = 'msp/einvoice';
     protected $_canUseCheckout = true;
     public $giftcards = array(
         'msp_webgift',
@@ -54,17 +54,20 @@ class MultiSafepay_Msp_Model_Gateway_Klarna extends MultiSafepay_Msp_Model_Gatew
 
     public function __construct() {
         $availableByIP = true;
-        if (Mage::getStoreConfig('msp_gateways/msp_klarna/ip_check')) {
+
+        if (Mage::getStoreConfig('msp_gateways/msp_einvoice/ip_check')) {
             if ($this->_isTestMode()) {
-                $data = Mage::getStoreConfig('msp_gateways/msp_klarna/ip_filter_test');
+                $data = Mage::getStoreConfig('msp_gateways/msp_einvoice/ip_filter_test');
             } else {
-                $data = Mage::getStoreConfig('msp_gateways/msp_klarna/ip_filter');
+                $data = Mage::getStoreConfig('msp_gateways/msp_einvoice/ip_filter');
             }
 
             if (!in_array($_SERVER["REMOTE_ADDR"], explode(';', $data))) {
                 $availableByIP = false;
             }
         }
+
+
 
         if (in_array($this->_code, $this->gateways)) {
             $this->_configCode = 'msp_gateways';
@@ -78,6 +81,7 @@ class MultiSafepay_Msp_Model_Gateway_Klarna extends MultiSafepay_Msp_Model_Gatew
             $isAllowConvert = Mage::getStoreConfigFlag('msp/settings/allow_convert_currency');
         }
 
+
         if ($isAllowConvert) {
             $availableByCurrency = true;
         } else {
@@ -87,6 +91,7 @@ class MultiSafepay_Msp_Model_Gateway_Klarna extends MultiSafepay_Msp_Model_Gatew
                 $availableByCurrency = false;
             }
         }
+
         $this->_canUseCheckout = $availableByIP && $availableByCurrency;
     }
 
@@ -102,19 +107,19 @@ class MultiSafepay_Msp_Model_Gateway_Klarna extends MultiSafepay_Msp_Model_Gatew
         } else {
             $accountnumber = '';
         }
-
-        if (isset($_POST['payment']['gender'])) {
-            $gender = $_POST['payment']['gender'];
+        
+        
+        if (isset($_POST['payment']['phonenumber'])) {
+            $phonenumber = $_POST['payment']['phonenumber'];
         } else {
-            $gender = '';
+            $phonenumber = '';
         }
-
 
         $url = $this->getModelUrl("msp/standard/redirect/issuer/" . $this->_issuer);
         if (!strpos($url, "?"))
-            $url .= '?birthday=' . $birthday . '&accountnumber=' . $accountnumber . '&gender=' . $gender;
+            $url .= '?birthday=' . $birthday . '&accountnumber=' . $accountnumber. '&phonenumber=' . $phonenumber;
         else
-            $url .= '&birthday=' . $birthday . '&accountnumber=' . $accountnumber . '&gender=' . $gender;
+            $url .= '&birthday=' . $birthday . '&accountnumber=' . $accountnumber. '&phonenumber=' . $phonenumber;
         return $url;
     }
 
@@ -125,7 +130,7 @@ class MultiSafepay_Msp_Model_Gateway_Klarna extends MultiSafepay_Msp_Model_Gatew
      * @return bool
      */
     protected function _isTestMode($store = null) {
-        $mode = Mage::getStoreConfig('msp_gateways/msp_klarna/test_api_pad', $store);
+        $mode = Mage::getStoreConfig('msp_gateways/msp_einvoice/test_api_pad', $store);
 
         return $mode == MultiSafepay_Msp_Model_Config_Sources_Accounts::TEST_MODE;
     }

@@ -60,9 +60,19 @@ class MultiSafepay_Msp_Model_Servicecost_Observer {
         $data = Mage::app()->getRequest()->getPost('creditmemo');
         $order = $creditmemo->getOrder();
  
-		$base_credit = $order->getBaseTotalRefunded() + $data['servicecost'] + $data['shipping_amount'] + $data['adjustment_positive'] - $data['adjustment_negative'] - $order->getBaseServicecost();
-        $credit = $order->getTotalRefunded() + $data['servicecost'] + $data['shipping_amount'] + $data['adjustment_positive'] - $data['adjustment_negative'] - $order->getBaseServicecost();
-	
+		//$base_credit = $order->getBaseTotalRefunded() + $data['servicecost'] + $data['shipping_amount'] + $data['adjustment_positive'] - $data['adjustment_negative'] - $order->getBaseServicecost();
+        //$credit = $order->getTotalRefunded() + $data['servicecost'] + $data['shipping_amount'] + $data['adjustment_positive'] - $data['adjustment_negative'] - $order->getBaseServicecost();
+        
+        //Disabled to test for PLGMAG-160
+        // $base_credit = $order->getBaseSubtotalInclTax() + $data['servicecost'] + $data['shipping_amount'] + $data['adjustment_positive'] - $data['adjustment_negative'];
+        // $credit = $order->getSubtotalInclTax() + $data['servicecost'] + $data['shipping_amount'] + $data['adjustment_positive'] - $data['adjustment_negative'];
+        
+        //NEW to test for PLGMAG-160
+        $base_credit = $creditmemo->getBaseSubtotalInclTax() + $data['servicecost'] + $data['shipping_amount']  + $data['adjustment_positive'] - $data['adjustment_negative']+$creditmemo->getShippingTaxAmount();
+        $credit = $creditmemo->getSubtotalInclTax() + $data['servicecost'] + $data['shipping_amount'] + $data['adjustment_positive'] - $data['adjustment_negative']+$creditmemo->getShippingTaxAmount();
+        
+        
+        
         $creditmemo->setGrandTotal($credit);
         $creditmemo->setBaseGrandTotal($base_credit);
     }
