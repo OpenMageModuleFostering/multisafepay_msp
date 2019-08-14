@@ -181,7 +181,7 @@ class MultiSafepay_Msp_Model_Checkout extends Mage_Payment_Model_Method_Abstract
 		}
 	
 
-        // $this->getShipping();
+        $this->getShipping();//
         $this->_getShippingRates();
         $this->setTaxes();
         $this->getCustomFieldsFromFile();

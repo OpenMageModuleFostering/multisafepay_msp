@@ -22,8 +22,10 @@ abstract class MultiSafepay_Msp_Model_Gateway_Abstract extends Mage_Payment_Mode
     protected $_canCapture             = true;
     protected $_canCapturePartial      = true;
     protected $_canUseForMultishipping = false;
-    protected $_canUseInternal         = true;
-
+	protected $_canUseInternal          = true;
+   /*	protected $_canRefund               = true;
+    protected $_canRefundInvoicePartial = true;
+	protected $_isInitializeNeeded      = true;*/
     public $payment;
 
     public function __construct()
@@ -115,8 +117,19 @@ abstract class MultiSafepay_Msp_Model_Gateway_Abstract extends Mage_Payment_Mode
 		// get store id
 		if (!$storeId)
 		{
+			//$storeId = $this->getStore();
 			$storeId = Mage::app()->getStore()->getStoreId();
+			
 		}
+		
+		$orderId = Mage::app()->getRequest()->getQuery('transactionid');
+			
+		if($orderId)
+		{
+			$storeId = Mage::getSingleton('sales/order')->loadByIncrementId($orderId)->getStoreId();
+		}
+		
+		
 		
 		// basic settings
 		$configSettings = array();
@@ -270,7 +283,8 @@ abstract class MultiSafepay_Msp_Model_Gateway_Abstract extends Mage_Payment_Mode
     public function getConfigData($field, $storeId = null)
     {
         if (null === $storeId) {
-            	$storeId = Mage::app()->getStore()->getStoreId();//$this->getStore();
+            	//$storeId = Mage::app()->getStore()->getStoreId();//$this->getStore();
+				$storeId = $this->getStore();
         }
         $path = $this->_module . "/" . $this->_code . '/' . $field;
 

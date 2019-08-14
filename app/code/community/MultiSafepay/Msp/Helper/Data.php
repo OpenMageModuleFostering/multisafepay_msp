@@ -8,8 +8,6 @@
 
 class MultiSafepay_Msp_Helper_Data extends Mage_Core_Helper_Abstract
 {
-    const XML_PATH_MSP_FEE_DESCRIPTION = 'msp/msp_payafter/fee_description';
-
     const CONVERT_TO_CURRENCY_CODE     = 'EUR';
 
     /**
@@ -35,75 +33,29 @@ class MultiSafepay_Msp_Helper_Data extends Mage_Core_Helper_Abstract
                 $iconFileUrl = Mage::getBaseUrl(Mage_Core_Model_Store::URL_TYPE_MEDIA) . $fileWithPath;
                 $return = '<img src="' . $iconFileUrl . '" id="'. 'msp_' . $paymentCode .'" title="' . $paymentTitle . '" />&nbsp;';
                 if ($isShowImgWithName) {
-                    //$return .= '<span class="gateway-title"> - ' . $paymentTitle . '</span>';
+                    $return .= '<span class="gateway-title"> - ' . $paymentTitle . '</span>';
                 }
             }
         }
-		echo $return;
-       // return  $return;
+		//echo $return;
+       return  $return;
     }
 	
-	
-	
-	public function getPadIncExcTax(){
-
-		if(Mage::getStoreConfig('msp/msp_payafter/fee_incexc'))
-		{
-			$including = true;
-		}else{
-			$including = false;
-		}
-		return $including;
-	}
-
-	public function getCheckoutFee()
-	{
-		$fee = Mage::getStoreConfig('msp/msp_payafter/fee_amount', Mage::app()->getStore()->getId());
-        
-      		$fee = str_replace(',', '.', $fee);
-		return $fee;
-	}
-	
-
-    /**
+	    /**
      * Get Fee Description
      *
      * @return string
      */
-    public function getFeeLabel()
+    public function getFeeLabel($code)
     {
-        $feeDescription = Mage::getStoreConfig(self::XML_PATH_MSP_FEE_DESCRIPTION);
+        $feeDescription = Mage::getStoreConfig('msp/'.$code.'/fee_description');
 
         return $feeDescription ? $feeDescription : $this->__('MultiSafepay servicekosten');
     }
+		
 
-    /**
-     * @param Mage_Sales_Model_Order         $order
-     * @param Mage_Sales_Model_Order_Invoice $invoice
-     * @return void
-     */
-    public function resetPaymentFeeInvoicedValues($order, $invoice)
-    {
-        $basePaymentFee    = $invoice->getBasePaymentFee();
-        $paymentFee        = $invoice->getPaymentFee();
-        $basePaymentFeeTax = $invoice->getBasePaymentFeeTax();
-        $paymentFeeTax     = $invoice->getPaymentFeeTax();
-
-        $basePaymentFeeInvoiced    = $order->getBasePaymentFeeInvoiced();
-        $paymentFeeInvoiced        = $order->getPaymentFeeInvoiced();
-        $basePaymentFeeTaxInvoiced = $order->getBasePaymentFeeTaxInvoiced();
-        $paymentFeeTaxInvoiced     = $order->getPaymentFeeTaxInvoiced();
-
-        if ($basePaymentFeeInvoiced && $basePaymentFee && $basePaymentFeeInvoiced >= $basePaymentFee) {
-            $order->setBasePaymentFeeInvoiced($basePaymentFeeInvoiced - $basePaymentFee)
-                ->setPaymentFeeInvoiced($paymentFeeInvoiced - $paymentFee)
-                ->setBasePaymentFeeTaxInvoiced($basePaymentFeeTaxInvoiced - $basePaymentFeeTax)
-                ->setBasePaymentFeeInvoiced($paymentFeeTaxInvoiced - $paymentFeeTax);
-            $order->save();
-        }
-    }
-
-
+	
+	
     /**
      * Check are you in the Admin area
      *
@@ -117,6 +69,7 @@ class MultiSafepay_Msp_Helper_Data extends Mage_Core_Helper_Abstract
 
         return false;
     }
+
 
 
     /**

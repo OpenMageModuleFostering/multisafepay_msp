@@ -234,8 +234,8 @@ class MultiSafepay_Msp_Model_Payment extends Varien_Object
             $currencyCode               =     $baseCurrencyCode;
         }
 
-        $amount                         =     intval((string)($amount * 100));
-        $amount                         =     round($amount * $this->pay_factor);
+		$amount 					= 	   intval((string)(round($amount * 100))); 
+		$amount 					=      round($amount * $this->pay_factor);
 
         $storename  					= 	  Mage::app()->getStore()->getName();
         $billing                        =     $this->getOrder()->getBillingAddress();
@@ -271,8 +271,8 @@ class MultiSafepay_Msp_Model_Payment extends Varien_Object
         $this->api->test                                =     $isTestMode;
         $this->api->merchant['notification_url']        =     $this->_notification_url . "?type=initial";
         $this->api->merchant['cancel_url']              =     $this->_cancel_url;
-       // $this->api->merchant['redirect_url']            =     ($this->getConfigData('use_redirect')) ? $this->_return_url : '';
-		$this->api->merchant['redirect_url']     		= 	($this->getConfigData('use_redirect')) ? $this->_return_url.'?transactionid='.$orderId : '';
+        $this->api->merchant['redirect_url']            =     ($this->getConfigData('use_redirect')) ? $this->_return_url : '';
+		//$this->api->merchant['redirect_url']     		= 	($this->getConfigData('use_redirect')) ? $this->_return_url.'?transactionid='.$orderId : '';
 		$this->api->parseCustomerAddress($billing->getStreet(1));
        
 		if ($this->api->customer['housenumber'] == '') {
@@ -339,6 +339,7 @@ class MultiSafepay_Msp_Model_Payment extends Varien_Object
         $this->api->transaction['gateway']               =    $this->_gateway;
         $this->api->transaction['issuer']                =    $this->_issuer;
         $this->api->transaction['items']                 =    $items;
+		$this->api->transaction['daysactive']            =   $this->getConfigData("pad_daysactive" . $suffix);
         $this->api->setDefaultTaxZones();
 
         $this->getItems($this->getOrder(), $currencyCode);
@@ -356,7 +357,8 @@ class MultiSafepay_Msp_Model_Payment extends Varien_Object
             $this->api->cart->AddItem($c_item);
         }
 
-        $taxClass = Mage::getStoreConfig('msp/msp_payafter/fee_tax_class');
+
+ $taxClass = Mage::getStoreConfig('msp/msp_payafter/fee_tax_class');
         
         if ($taxClass == 0) {
             $this->_rate = 1;
@@ -401,6 +403,7 @@ class MultiSafepay_Msp_Model_Payment extends Varien_Object
             $c_item->SetTaxTableSelector('FEE');
             $this->api->cart->AddItem($c_item);
         }
+
 
          //add none taxtable
         $table       = new MspAlternateTaxTable();
@@ -477,13 +480,18 @@ class MultiSafepay_Msp_Model_Payment extends Varien_Object
         }
 
         $send_order_email = $this->getConfigData("new_order_mail");
-        if ($send_order_email == 'after_confirmation') {
-            if (!$this->getOrder()->getEmailSent()) {
-               // $this->getOrder()->setEmailSent(true);
-                $this->getOrder()->save();
-                $this->getOrder()->sendNewOrderEmail();
-            }
-        }
+		
+		
+		if($this->getOrder()->getCanSendNewEmailFlag())
+		{
+			if ($send_order_email == 'after_confirmation') {
+				if (!$this->getOrder()->getEmailSent()) {
+					$this->getOrder()->sendNewOrderEmail();
+					$this->getOrder()->setEmailSent(true);
+					$this->getOrder()->save();
+				}
+			}
+		}
 
         return $url;
     }
@@ -491,7 +499,7 @@ class MultiSafepay_Msp_Model_Payment extends Varien_Object
     /**
      * @return bool
      */
-    protected function _isTestPayAfterDelivery()
+	 protected function _isTestPayAfterDelivery()
     {
         $isTest = ($this->getConfigData('test_api_pad') == MultiSafepay_Msp_Model_Config_Sources_Accounts::TEST_MODE);
         if ($isTest) {
@@ -624,12 +632,15 @@ class MultiSafepay_Msp_Model_Payment extends Varien_Object
         return Mage::getModel('customer/group')->load($customerGroup)->getTaxClassId();
     }
     
-    protected function getItems($order, $targetCurrencyCode)
+   protected function getItems($order, $targetCurrencyCode)
     {
         $items = $order->getAllItems();
+	
+
         foreach ($items as $item) {
             $product_id = $item->getProductId();
-            
+		     
+
             foreach ($order->getAllItems() as $order_item) {
                 $order_product_id = $order_item->getProductId();
                 if ($order_product_id == $product_id) {
@@ -666,18 +677,53 @@ class MultiSafepay_Msp_Model_Payment extends Varien_Object
                 $itemName .= $optionString;
                 $itemName .= ')';
             }
-
+			
+			$proddata = Mage::getModel('catalog/product')->load($product_id);
             $currentCurrencyCode = Mage::app()->getStore()->getCurrentCurrencyCode();
-            $price = number_format($this->_convertCurrency($item->getPrice(), $currentCurrencyCode, $targetCurrencyCode), 4, '.', '');
+            
             //$quantity = round($item->getQtyOrdered(), 2);
+	
+		$ndata = $item->getData();
+		 	if($ndata['price'] != 0)
+		{
+			//Test-> Magento rounds at 2 decimals so the recalculation goes wrong with large quantities.
+			$price_with_tax = $ndata['price_incl_tax'];
+			$tax_rate =$rate;
+			$divided_value = 1+($tax_rate);
+			$price_without_tax = $price_with_tax/$divided_value;
+			$price = round($price_without_tax,4);
+			$price = number_format($this->_convertCurrency($price, $currentCurrencyCode, $targetCurrencyCode), 4, '.', '');
 
-            // create item
-            $c_item = new MspItem($itemName, $item->getDescription(), $quantity, $price, 'KG', $item->getWeight());
-            $c_item->SetMerchantItemId($item->getSku());
-            $c_item->SetTaxTableSelector($taxClass);
-            $this->api->cart->AddItem($c_item);
+			$tierprices = $proddata->getTierPrice();
+			if(count($tierprices) > 0)
+			{
+				$product_tier_prices = (object)$tierprices;
+	 			$product_price = array();
+	 			foreach($product_tier_prices as $key=>$value){
+	  				$value = (object)$value;
+  					$product_price[] = $value->price;
+					if($item->getQtyOrdered() >= $value->price_qty)
+				
+					$price_with_tax = $value->price;
+					$tax_rate =$rate;
+					$divided_value = 1+($tax_rate);
+					$price_without_tax = $price_with_tax/$divided_value;
+					$price = round($price_without_tax,4);
+					$price = number_format($this->_convertCurrency($price, $currentCurrencyCode, $targetCurrencyCode), 4, '.', '');
+
+				}
+			}
+		
+			
+         	   // create item
+         	   $c_item = new MspItem($itemName, $item->getDescription(), $quantity, $price, 'KG', $item->getWeight());
+         	   $c_item->SetMerchantItemId($item->getSku());
+         	   $c_item->SetTaxTableSelector($taxClass);
+         	   $this->api->cart->AddItem($c_item);
+		}
         }
     }
+
 
     /**
      * Send a transaction request to MultiSafepay and return the payment_url
@@ -701,12 +747,24 @@ class MultiSafepay_Msp_Model_Payment extends Varien_Object
         $quote_grand_total          =     $quote->getGrandTotal();
         $order_grand_total          =     $order->getGrandTotal();
         
-        if ($quote_base_grand_total == $order_base_grand_total) {
+		
+		$checked_amount         =     $order_base_grand_total;
+        $checked_amount_current =     $order_grand_total;
+		
+		
+       /* 
+	   Code below is disabled because this check causes error with different thirt party modules. Also this was more meant for BNO, so in stratPayAfterTransaction it remains.
+	   
+	   if ($quote_base_grand_total == $order_base_grand_total) {
             $checked_amount         =     $order_base_grand_total;
             $checked_amount_current =     $order_grand_total;
         } else {
             Mage::throwException(Mage::helper("msp")->__("The cart total is not the same as the order total! Creation of the transaction is halted."));
-        }
+        }*/
+		
+		$gateway_data = $quote->getPayment()->getData();
+		$gateway = strtoupper(str_replace("msp_", '', $gateway_data['method']));
+		
 
         // currency check
         $isAllowConvert             =     Mage::getStoreConfigFlag('msp/settings/allow_convert_currency');
@@ -735,9 +793,9 @@ class MultiSafepay_Msp_Model_Payment extends Varien_Object
             $amount                 =     $checked_amount;
             $currencyCode           =     Mage::app()->getBaseCurrencyCode();
         }
-
-        $amount                     =     intval((string)($amount * 100));
-        $amount                     =     round($amount * $this->pay_factor);
+		
+		$amount 					= 	   intval((string)(round($amount * 100))); 
+		$amount 					=      round($amount * $this->pay_factor);
 
         $storename  					= 	Mage::app()->getStore()->getName();
         $billing                    =     $this->getOrder()->getBillingAddress();
@@ -755,25 +813,28 @@ class MultiSafepay_Msp_Model_Payment extends Varien_Object
         $this->api->test                       =     ($this->getConfigData("test_api") == 'test');
         $api->merchant['notification_url']     =     $this->_notification_url . "?type=initial";
         $api->merchant['cancel_url']           =     $this->_cancel_url;
-      //  $api->merchant['redirect_url']         =     ($this->getConfigData('use_redirect')) ? $this->_return_url : '';
-		$api->merchant['redirect_url']     	   = 	($this->getConfigData('use_redirect')) ? $this->_return_url.'?transactionid='.$orderId : '';
-
-        if ($this->getConfigData('use_redirect')) {
-            $this->api->customer['housenumber']=     $billing->getStreet(2);
-            $this->api->customer['address1']   =     $billing->getStreet(1);
-        } else {
-            $api->parseCustomerAddress($billing->getStreet(1));
-        }
-        
+		$api->merchant['redirect_url']         =     ($this->getConfigData('use_redirect')) ? $this->_return_url : '';
+		//$api->merchant['redirect_url']     	   = 	($this->getConfigData('use_redirect')) ? $this->_return_url.'?transactionid='.$orderId : '';
 		$api->customer['locale']           	   =	Mage::app()->getLocale()->getLocaleCode();//Mage::app()->getLocale()->getDefaultLocale();
-        $api->customer['firstname']            =     $billing->getFirstname();
-        $api->customer['lastname']             =     $billing->getLastname();
-        //$api->customer['address2']           =     $billing->getStreet(2);
-        $api->customer['zipcode']              =     $billing->getPostcode();
-        $api->customer['city']                 =     $billing->getCity();
-        $api->customer['state']                =     $billing->getState();
-        $api->customer['country']              =     $billing->getCountry();
-        $api->customer['phone']                =     $billing->getTelephone();
+		
+		if(is_object($billing))
+		{
+			$this->api->parseCustomerAddress($billing->getStreet(1));
+       
+			if ($this->api->customer['housenumber'] == '') {
+				$this->api->customer['housenumber']         =     $billing->getStreet(2);
+				$this->api->customer['address1']            =     $billing->getStreet(1);
+			}
+        
+			$api->customer['firstname']            =     $billing->getFirstname();
+			$api->customer['lastname']             =     $billing->getLastname();
+			//$api->customer['address2']           =     $billing->getStreet(2);
+			$api->customer['zipcode']              =     $billing->getPostcode();
+			$api->customer['city']                 =     $billing->getCity();
+			$api->customer['state']                =     $billing->getState();
+			$api->customer['country']              =     $billing->getCountry();
+			$api->customer['phone']                =     $billing->getTelephone();
+		}
         $api->customer['email']                =     $this->getOrder()->getCustomerEmail();
         if(isset($_SERVER['HTTP_REFERER'])){
 			$api->customer['referrer']			=	$_SERVER['HTTP_REFERER'];
@@ -789,7 +850,7 @@ class MultiSafepay_Msp_Model_Payment extends Varien_Object
         $api->transaction['var3']              =     Mage::app()->getStore()->getStoreId();
         $api->transaction['description']       =     'Order #' . $orderId . ' at ' . $storename;
         $api->transaction['items']             =     $items;
-        $api->transaction['gateway']           =     $this->_gateway;
+        $api->transaction['gateway']       	= 	$gateway;
 		if($api->transaction['gateway'] == ''){
 			$api->transaction['gateway']	= 'connect';
 		}
@@ -896,6 +957,13 @@ class MultiSafepay_Msp_Model_Payment extends Varien_Object
 		//ALL data available? Then request the transaction link
 		*/
 		
+		
+		if($this->_gateway == 'BANKTRANS')
+		{
+			$api->transaction['gateway']           =     'BANKTRANS';
+		}
+
+		
         if ($this->_gateway == 'IDEAL' && (isset($_REQUEST['bank']) && !empty($_REQUEST['bank']))) {
             $api->extravars                    =     $_REQUEST['bank'];
             $url                               =     $api->startDirectXMLTransaction();
@@ -924,17 +992,29 @@ class MultiSafepay_Msp_Model_Payment extends Varien_Object
 
 			// add error status history
 			$this->getOrder()->addStatusToHistory($this->getOrder()->getStatus(), Mage::helper("msp")->__("Error creating transaction").'<br/>'.$api->error_code . " - " . $api->error);
-			$this->getOrder()->save();
-
-			// raise error
-			//Mage::throwException(Mage::helper("msp")->__("An error occured: ") . $api->error_code . " - " . $api->error);
-			$errorMessage= Mage::helper("msp")->__("An error occured: ") . $api->error_code . " - " . $api->error. '<br />'.Mage::helper("msp")->__("Please retry placing your order and select a different payment method.");
-			 Mage::log($errorMessage);
 			
-			Mage::getSingleton('checkout/session')->addError($errorMessage);
- 			session_write_close();
-			Mage::app()->getFrontController()->getResponse()->setRedirect(Mage::getUrl('checkout/cart'));
-			Mage::app()->getResponse()->sendResponse();
+			if($orderId =! '')
+			{
+				$this->getOrder()->save();
+				// raise error
+				//Mage::throwException(Mage::helper("msp")->__("An error occured: ") . $api->error_code . " - " . $api->error);
+				$errorMessage= Mage::helper("msp")->__("An error occured: ") . $api->error_code . " - " . $api->error. '<br />'.Mage::helper("msp")->__("Please retry placing your order and select a different payment method.");
+				Mage::log($errorMessage);
+			
+				Mage::getSingleton('checkout/session')->addError($errorMessage);
+				session_write_close();
+				Mage::app()->getFrontController()->getResponse()->setRedirect(Mage::getUrl('checkout/cart'));
+				Mage::app()->getResponse()->sendResponse();
+			}else{
+				//Mage::throwException(Mage::helper("msp")->__("An error occured: ") . $api->error_code . " - " . $api->error);
+				$errorMessage= Mage::helper("msp")->__("An error occured: "). '<br />'.Mage::helper("msp")->__("Please retry placing your order and select a different payment method.");
+				Mage::log($errorMessage);
+			
+				Mage::getSingleton('checkout/session')->addError($errorMessage);
+				session_write_close();
+				Mage::app()->getFrontController()->getResponse()->setRedirect(Mage::getUrl('checkout/cart'));
+				Mage::app()->getResponse()->sendResponse();
+			}
 			exit;
 		}
 
@@ -945,13 +1025,16 @@ class MultiSafepay_Msp_Model_Payment extends Varien_Object
         }
         
         $send_order_email = $this->getConfigData("new_order_mail");
-        if ($send_order_email == 'after_confirmation') {
-            if (!$this->getOrder()->getEmailSent()) {
-               // $this->getOrder()->setEmailSent(true);
-                $this->getOrder()->save();
-                $this->getOrder()->sendNewOrderEmail();
-            }
-        }
+		if($this->getOrder()->getCanSendNewEmailFlag())
+		{
+			if ($send_order_email == 'after_confirmation') {
+				if (!$this->getOrder()->getEmailSent()) {
+					$this->getOrder()->sendNewOrderEmail();
+					$this->getOrder()->setEmailSent(true);
+					$this->getOrder()->save();
+				}
+			}
+		}
         
         return $url;
     }
@@ -964,22 +1047,21 @@ class MultiSafepay_Msp_Model_Payment extends Varien_Object
     
         $base = $this->getBase($orderId);
 		
-		//TEMP locking disabled because of check on redirect url
         // check lock
-       /* if ($base->isLocked()) {
+        if ($base->isLocked()) {
             $base->preventLockDelete();
     
             if ($initial) {
                 return;
             } else {
-                echo 'locked';
-                exit();
+               
+               return false;
             }
         }
 
         // lock
         $base->lock();
-		*/
+		
        $orderexist = $order->getIncrementId();
 	
 

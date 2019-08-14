@@ -196,7 +196,9 @@ class MultiSafepay_Msp_Model_Base extends Varien_Object
                 $complete      = true;
                 $newState      = Mage_Sales_Model_Order::STATE_PROCESSING;
                 $newStatus     = $statusComplete;
-                $statusMessage = Mage::helper("msp")->__("Payment Completed");          
+                $statusMessage = Mage::helper("msp")->__("Payment Completed"); 
+				//order is paid so set it to paid
+				//$order->setTotalPaid($order->getGrandTotal());
             break;
             case "uncleared":
                 $newState      = Mage_Sales_Model_Order::STATE_NEW;
@@ -208,36 +210,59 @@ class MultiSafepay_Msp_Model_Base extends Varien_Object
                 $newState      = Mage_Sales_Model_Order::STATE_CANCELED;
                 $statusMessage = Mage::helper("msp")->__("Transaction voided");
                 $newStatus     = $statusVoid;
-                $order->cancel(); // this trigers stock updates
-                $order->setState($newState, $newStatus, $statusMessage)->save();
-                $orderSaved    = true;
+		  if( $order->getState() != 'complete')
+		  {
+                	$order->cancel(); // this trigers stock updates
+                	$order->setState($newState, $newStatus, $statusMessage)->save();
+               	$orderSaved    = true;
+	         }
             break;
             case "declined":
                 $cancel        = true;
                 $newState      = Mage_Sales_Model_Order::STATE_CANCELED;
                 $statusMessage = Mage::helper("msp")->__("Transaction declined");
                 $newStatus     = $statusDeclined;
-                $order->cancel(); // this trigers stock updates
-                $order->setState($newState, $newStatus, $statusMessage)->save();
-                $orderSaved    = true;
+               if( $order->getState() != 'complete')
+		  {
+                	$order->cancel(); // this trigers stock updates
+                	$order->setState($newState, $newStatus, $statusMessage)->save();
+               	$orderSaved    = true;
+	         }
             break;
             case "expired":
                 $cancel        = true;
                 $newState      = Mage_Sales_Model_Order::STATE_CANCELED;
                 $statusMessage = Mage::helper("msp")->__("Transaction is expired");
                 $newStatus     = $statusExpired;
-                $order->cancel(); //this trigers stock updates
-                $order->setState($newState, $newStatus, $statusMessage)->save();
-                $orderSaved    = true;
+                if( $order->getState() != 'complete')
+		  {
+                	$order->cancel(); // this trigers stock updates
+                	$order->setState($newState, $newStatus, $statusMessage)->save();
+               	$orderSaved    = true;
+	         }
             break;
             case "canceled":
                 $cancel        = true;
                 $newState      = Mage_Sales_Model_Order::STATE_CANCELED;
                 $statusMessage = Mage::helper("msp")->__("Transaction canceled");
                 $newStatus     = $statusVoid;
-                $order->cancel();                    //this trigers stock updates
-                $order->setState($newState, $newStatus, $statusMessage)->save();
-                $orderSaved    = true;
+                if( $order->getState() != 'complete')
+		  {
+                	$order->cancel(); // this trigers stock updates
+                	$order->setState($newState, $newStatus, $statusMessage)->save();
+               	$orderSaved    = true;
+	         }
+			break;
+			case "refunded":
+				$statusMessage = Mage::helper("msp")->__("Transaction refunded");
+				$payment 							= 	$order->getPayment();
+				$payment->setTransactionId($mspDetails['ewallet']['id']);
+				$transaction 						= 	$payment->addTransaction('refund', null, false, $statusMessage);
+				$transaction->setParentTxnId($mspDetails['ewallet']['id']);
+				$transaction->setIsClosed(1);
+				$transaction->setAdditionalInformation(Mage_Sales_Model_Order_Payment_Transaction::RAW_DETAILS, $transdetails);
+				$transaction->save();
+			break;
             default:
                 $statusMessage = Mage::helper("msp")->__("Status not found " . $mspStatus);
             return false;
@@ -253,7 +278,7 @@ class MultiSafepay_Msp_Model_Base extends Varien_Object
 
         $current_state  = $order->getState();
         $canUpdate      = false;
-        
+       
         
         /**
          *     TESTING UNDO CANCEL
@@ -306,88 +331,110 @@ class MultiSafepay_Msp_Model_Base extends Varien_Object
 		}else{
 			$is_already_invoiced 				= 	false;
 		}*/
-		
-		if($order->hasInvoices()) 
+		if (!$this->isStatusInHistory($order, $mspStatus))
 		{
-			$is_already_invoiced 				= 	true;
-		}else{
-			$is_already_invoiced 				= 	false;
-			$payment 							= 	$order->getPayment();
-			$payment->setTransactionId($mspDetails['ewallet']['id']);
-			$transaction 						= 	$payment->addTransaction('capture', null, false, $statusMessage);
-			$transaction->setParentTxnId($mspDetails['ewallet']['id']);
-			$transaction->setIsClosed(0);
-			$transaction->setAdditionalInformation(Mage_Sales_Model_Order_Payment_Transaction::RAW_DETAILS, $transdetails);
-			$transaction->save();
-			
-			if ($complete && $autocreateInvoice)
+			if($order->hasInvoices()) 
 			{
-				$this->createInvoice($order);// Validate this function with 1.7.0.2 and lower
 				$is_already_invoiced 				= 	true;
-			}
-		}
-
-		
-		if ($order->getState() == Mage_Sales_Model_Order::STATE_NEW )
-		{
-			$canUpdate 							= 	true;
-		}
-		
-		// update the status if changed
-		if ($canUpdate && (($newState != $order->getState()) || ($newStatus != $order->getStatus())))
-		{
-			$order->setState($newState, $newStatus, $statusMessage);
+			}else{
+				$is_already_invoiced 				= 	false;
 				
-			// create an invoice when the payment is completed
-			if ($complete)
-			{
-				$send_update_email 				= 	$this->getConfigData("send_update_email");
-				
-				if($send_update_email){
-					$order->sendOrderUpdateEmail(true);
+				if ($complete && $autocreateInvoice)
+				{
+					$payment                                                        =       $order->getPayment();
+					$payment->setTransactionId($mspDetails['ewallet']['id']);
+					$transaction                                            =       $payment->addTransaction('capture', null, false, $statusMessage);
+					$transaction->setParentTxnId($mspDetails['ewallet']['id']);
+					$transaction->setIsClosed(0);
+					$transaction->setAdditionalInformation(Mage_Sales_Model_Order_Payment_Transaction::RAW_DETAILS, $transdetails);
+					$transaction->save();
+					
+					$this->createInvoice($order);// Validate this function with 1.7.0.2 and lower
+					$is_already_invoiced 				= 	true;
+				}elseif($complete && $order->getState() == Mage_Sales_Model_Order::STATE_NEW)
+				{
+						$payment 							= 	$order->getPayment();
+						$payment->setTransactionId($mspDetails['ewallet']['id']);
+						$transaction 						= 	$payment->addTransaction('capture', null, false, $statusMessage);
+						$transaction->setParentTxnId($mspDetails['ewallet']['id']);
+						$transaction->setIsClosed(0);
+						$transaction->setAdditionalInformation(Mage_Sales_Model_Order_Payment_Transaction::RAW_DETAILS, $transdetails);
+						$transaction->save();
+						$order->setTotalPaid($order->getGrandTotal());
 				}
-				//$this->createInvoice($order);// Validate this function with 1.7.0.2 and lower
 			}
-		} else {
-            // add status to history if it's not there
-            if (!$this->isStatusInHistory($order, $mspStatus) && (ucfirst($order->getState()) != ucfirst(Mage_Sales_Model_Order::STATE_CANCELED))) {
-                $order->addStatusToHistory($order->getStatus(), $statusMessage);
-            }
-        }
 
-        /**
-         *    Fix to activate new order email function to be activated
-         */
-        $send_order_email = $this->getConfigData("new_order_mail");
-        
-        if ($send_order_email == 'after_payment') {
-            if (!$order->getEmailSent() && (ucfirst($order->getState()) == ucfirst(Mage_Sales_Model_Order::STATE_PROCESSING))) {
-                //$order->setEmailSent(true);
-                $order->save();
-                $orderSaved = true;
-                $order->sendNewOrderEmail();
-            }
-        } elseif($send_order_email =='after_notify_without_cancel' && (ucfirst($order->getState()) != ucfirst(Mage_Sales_Model_Order::STATE_CANCELED))) {
-            if (!$order->getEmailSent()) {
-               // $order->setEmailSent(true);
-                $order->save();
-                $orderSaved                     =     true;
-                $order->sendNewOrderEmail();
-            }
-        } elseif($send_order_email =='after_notify_with_cancel') {
-            if (!$order->getEmailSent()) {
-               // $order->setEmailSent(true);
-                $order->save();
-                $orderSaved                     =     true;
-                $order->sendNewOrderEmail();
-            }
-        }
+			
+			if ($order->getState() == Mage_Sales_Model_Order::STATE_NEW || $order->getState() != 'complete' )
+			{
+				$canUpdate 							= 	true;
+			}else{
 
-        // save order if we haven't already
-        if (!$orderSaved) {
-            $order->save();
-        }
+				$canUpdate 							= 	false;
+			}
+			
 
+			// update the status if changed
+			if ($canUpdate && (($newState != $order->getState()) || ($newStatus != $order->getStatus())))
+			{
+				if (!$this->isStatusInHistory($order, $mspStatus))
+				{
+					$order->setState($newState, $newStatus, $statusMessage);
+				}
+					
+				// create an invoice when the payment is completed
+				//if ($complete)
+				//{
+					$send_update_email 				= 	$this->getConfigData("send_update_email");
+					
+					if($send_update_email){
+						$order->sendOrderUpdateEmail(true);
+					}
+					//$this->createInvoice($order);// Validate this function with 1.7.0.2 and lower
+				//}
+			} else {
+				// add status to history if it's not there
+				if (!$this->isStatusInHistory($order, $mspStatus) && (ucfirst($order->getState()) != ucfirst(Mage_Sales_Model_Order::STATE_CANCELED))) {
+					$order->addStatusToHistory($order->getStatus(), $statusMessage);
+				}
+			}
+
+			/**
+			 *    Fix to activate new order email function to be activated
+			 */
+			$send_order_email = $this->getConfigData("new_order_mail");
+			
+			if($order->getCanSendNewEmailFlag())
+			{
+				if ($send_order_email == 'after_payment') {
+					if (!$order->getEmailSent() && (ucfirst($order->getState()) == ucfirst(Mage_Sales_Model_Order::STATE_PROCESSING))) {
+						$order->sendNewOrderEmail();
+						$order->setEmailSent(true);
+						$order->save();
+						$orderSaved = true;
+					}
+				} elseif($send_order_email =='after_notify_without_cancel' && (ucfirst($order->getState()) != ucfirst(Mage_Sales_Model_Order::STATE_CANCELED))) {
+					if (!$order->getEmailSent()) {
+						$order->sendNewOrderEmail();
+						$order->setEmailSent(true);
+						$order->save();
+						$orderSaved                     =     true;
+					}
+				} elseif($send_order_email =='after_notify_with_cancel') {
+					if (!$order->getEmailSent()) {
+						$order->sendNewOrderEmail();
+						$order->setEmailSent(true);
+						$order->save();
+						$orderSaved                     =     true;
+					}
+				}
+			}
+
+			// save order if we haven't already
+			if (!$orderSaved) {
+				$order->save();
+			}
+		}
         // success
         return true;
     }
@@ -437,10 +484,125 @@ class MultiSafepay_Msp_Model_Base extends Varien_Object
     /**
      *  Create invoice for order
      */
+	 
+	 
+	 protected function createInvoice(Mage_Sales_Model_Order $order)
+	{
+		if ($order->getState() == Mage_Sales_Model_Order::STATE_NEW) 
+		{
+           	 	try {
+               	 	if(!$order->canInvoice()) {
+                   		$order->addStatusHistoryComment('MultiSafepay: Order cannot be invoiced.', false);
+                    			$order->save();
+								return false;
+                		}
+
+               		//START Handle Invoice
+               		$invoice = Mage::getModel('sales/service_order', $order)->prepareInvoice();
+               		$invoice->setRequestedCaptureCase(Mage_Sales_Model_Order_Invoice::CAPTURE_OFFLINE);
+               		$invoice->register();
+                		$invoice->getOrder()->setCustomerNoteNotify(false);
+                		$invoice->getOrder()->setIsInProcess(true);
+                		$order->addStatusHistoryComment('Automatically invoiced by MultiSafepay invoicer.', false);
+                		$transactionSave = Mage::getModel('core/resource_transaction')->addObject($invoice)->addObject($invoice->getOrder());
+                		$transactionSave->save();
+                		//END Handle Invoice
+
+				//Send Invoice emails
+				$mail_invoice = $this->getConfigData("mail_invoice");
+				$send_bno_invoice = $this->getConfigData("bno_no_invoice");
+				$gateway = $order->getPayment()->getMethodInstance()->_gateway;
+ 			
+			
+				if ($mail_invoice && $gateway != 'PAYAFTER')
+				{
+					$invoice->setEmailSent(true);
+					$invoice->sendEmail();
+					$invoice->save();
+				}elseif($gateway == 'PAYAFTER'  && !$send_bno_invoice && $mail_invoice)
+				{
+					$invoice->setEmailSent(true);
+					$invoice->sendEmail();
+				$invoice->save();
+				}
+				
+
+				$order->setTotalPaid($order->getGrandTotal());
+				
+            		} catch (Exception $e) {
+                		$order->addStatusHistoryComment('MultiSafepay invoicer: Exception occurred during the creation of the invoice. Exception message: '.$e->getMessage(), false);
+                		$order->save();
+            		}
+       	 }		
+		return false;
+	}
+	 
+	 
+	 
+	 
+	 
+	 /*
     protected function createInvoice(Mage_Sales_Model_Order $order)
     {
-	
 		$invoiceSaved 		= false;
+		
+		if(!$order->hasInvoices()  && $order->getTotalPaid() == 0)
+		{
+			try {
+				if(!$order->canInvoice())
+				{
+					Mage::throwException(Mage::helper('core')->__('Cannot create an invoice.'));
+				}
+	  
+				$invoice = Mage::getModel('sales/service_order', $order)->prepareInvoice();
+	  
+				if (!$invoice->getTotalQty()) {
+					Mage::throwException(Mage::helper('core')->__('Cannot create an invoice without products.'));
+				}
+	  
+				$invoice->setRequestedCaptureCase(Mage_Sales_Model_Order_Invoice::CAPTURE_ONLINE);
+				//Or you can use
+				//$invoice->setRequestedCaptureCase(Mage_Sales_Model_Order_Invoice::CAPTURE_OFFLINE);
+				$invoice->register();
+				$transactionSave = Mage::getModel('core/resource_transaction')->addObject($invoice)->addObject($invoice->getOrder());
+	  
+				$transactionSave->save();
+				 
+				$mail_invoice = $this->getConfigData("mail_invoice");
+				$send_bno_invoice = $this->getConfigData("bno_no_invoice");
+				$gateway = $order->getPayment()->getMethodInstance()->_gateway;
+			
+				if ($mail_invoice && $gateway != 'PAYAFTER')
+				{
+					$invoice->setEmailSent(true);
+					$invoiceSaved = true;
+					$invoice->sendEmail();
+				}elseif($gateway == 'PAYAFTER'  && $send_bno_invoice && $mail_invoice)
+				{
+					$invoice->setEmailSent(true);
+					$invoiceSaved = true;
+					$invoice->sendEmail();
+				}
+				
+				// save invoice if we haven't already
+				if (!$invoiceSaved)
+				{
+					$invoice->save();
+				}
+
+				$order->setTotalPaid($order->getGrandTotal());
+				$invoice->save();
+				return true;
+			}
+				catch (Mage_Core_Exception $e) {
+				return false;
+			}
+		}
+		return false;
+	
+*/
+	/*	
+	$invoiceSaved 		= false;
         if ($order->canInvoice() && !$order->getInvoiceCollection()->getSize()) {
             $invoice = $order->prepareInvoice();
             
@@ -492,7 +654,13 @@ class MultiSafepay_Msp_Model_Base extends Varien_Object
         }
 
         return false;
-    }
+
+
+
+	*/
+	
+
+  //  }
 
     /**
      *  Get lock file

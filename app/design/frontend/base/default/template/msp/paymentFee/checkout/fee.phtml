@@ -16,7 +16,8 @@
            <?php
 			if(Mage::helper("msp")->getPadIncExcTax())
 			{
-				echo Mage::helper("msp")->getCheckoutFee();
+				//echo Mage::helper("msp")->getCheckoutFee();
+				echo $this->helper('checkout')->formatPrice(Mage::helper("msp")->getCheckoutFee());
 			}else{
 				 echo $this->helper('checkout')->formatPrice($this->getPaymentFee());
 			}

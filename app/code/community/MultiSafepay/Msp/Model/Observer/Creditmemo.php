@@ -38,6 +38,7 @@ class MultiSafepay_Msp_Model_Observer_Creditmemo extends MultiSafepay_Msp_Model_
         'msp_directebanking',
         'msp_directdebit',
         'msp_fastcheckout',
+		'msp_amex',
     );
 
     public function sales_order_creditmemo_save_after(Varien_Event_Observer $observer)

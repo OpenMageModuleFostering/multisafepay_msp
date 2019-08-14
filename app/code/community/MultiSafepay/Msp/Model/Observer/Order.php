@@ -43,6 +43,7 @@ class MultiSafepay_Msp_Model_Observer_Order extends MultiSafepay_Msp_Model_Obser
 
     public function sales_order_save_after(Varien_Event_Observer $observer)
     {
+return true;
 	    /** @var $event Varien_Event */
         $event   = $observer->getEvent();
 

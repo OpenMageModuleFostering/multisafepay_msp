@@ -176,11 +176,11 @@ class MultiSafepay_Msp_CheckoutController extends Mage_Core_Controller_Front_Act
         $done = $checkout->notification($transactionId, $isInitial);
 
         if(!$return){	
-			if ($initial)
+			if ($isInitial)
 			{
-				$returnUrl = Mage::getUrl("msp/checkout/return", array("_secure" => true)) . '?transactionid=' . $transactionid;
+				$returnUrl = Mage::getUrl("msp/checkout/return", array("_secure" => true)) . '?transactionid=' . $transactionId;
 
-				$storeId = Mage::getModel('sales/quote')->load($transactionid)->getStoreId();
+				$storeId = Mage::getModel('sales/quote')->load($transactionId)->getStoreId();
 				$storeName = Mage::app()->getGroup($storeId)->getName();
 
  			// display return message

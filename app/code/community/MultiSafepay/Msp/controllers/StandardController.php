@@ -98,7 +98,7 @@ class MultiSafepay_Msp_StandardController extends Mage_Core_Controller_Front_Act
      */
     public function returnAction()
     {
-		$this->notificationAction(true);
+		//$this->notificationAction(true);
 		
         // Fix for emptying cart after success
        // $this->getOnepage()->getQuote()->setIsActive(false);
@@ -233,7 +233,7 @@ class MultiSafepay_Msp_StandardController extends Mage_Core_Controller_Front_Act
 							$storeName = Mage::app()->getGroup($storeId)->getName();
 
 							// display return message
-							echo 'Return to <a href="' . $returnUrl . '">' . $storeName . '</a>';
+							echo 'Return to <a href="' . $returnUrl . '?transactionid='.$orderId.'">' . $storeName . '</a>';
 
 						}else{
 							if ($done)
@@ -264,7 +264,7 @@ class MultiSafepay_Msp_StandardController extends Mage_Core_Controller_Front_Act
 					$storename  = $order->getStoreGroupName();
 
 					// display return message
-					$this->getResponse()->setBody('Return to <a href="' . $returnUrl . '">' . $storename . '</a>');	
+					$this->getResponse()->setBody('Return to <a href="' . $returnUrl . '?transactionid='.$orderId.'">' . $storename . '</a>');	
 				}else{
 					if ($done)
 				{
