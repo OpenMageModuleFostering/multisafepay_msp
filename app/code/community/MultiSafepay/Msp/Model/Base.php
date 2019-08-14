@@ -309,7 +309,7 @@ class MultiSafepay_Msp_Model_Base extends Varien_Object {
         $newState = null;
         $newStatus = true; // makes Magento use the default status belonging to state
         $statusMessage = '';
-		$this->_paid = $details['transaction']['amount']/100;
+		//$this->_paid = $details['transaction']['amount']/100;
 
         //If the order already has in invoice than it was paid for using another method? So if our transaction expires we shouldn't update it to cancelled because it was already invoiced.
         if ($order->hasInvoices() && $mspStatus == 'expired') {
@@ -359,11 +359,11 @@ class MultiSafepay_Msp_Model_Base extends Varien_Object {
                     $transaction->save();
                 }
                 
-                if(round($order->getGrandTotal(),2) != $this->_paid && $mspDetails['ewallet']['fastcheckout'] !='YES' && !Mage::getStoreConfigFlag('msp/settings/allow_convert_currency')){
+                /*if(round($order->getGrandTotal(),2) != $this->_paid && $mspDetails['ewallet']['fastcheckout'] !='YES' && !Mage::getStoreConfigFlag('msp/settings/allow_convert_currency')){
 	            	$newState = Mage_Sales_Model_Order::STATE_PAYMENT_REVIEW;
 					$newStatus = Mage_Sales_Model_Order::STATE_PAYMENT_REVIEW;
 					$statusMessage = Mage::helper("msp")->__("Payment received for an amount that is not equal to the order total amount. Please verify the paid amount!");
-                }
+                }*/
 
                 break;
             case "uncleared":
@@ -512,7 +512,7 @@ class MultiSafepay_Msp_Model_Base extends Varien_Object {
                 $is_already_invoiced = false;
                 
 
-                if ($complete && $autocreateInvoice && $this->_paid == round($order->getBaseGrandTotal(), 2) && !Mage::getStoreConfigFlag('msp/settings/allow_convert_currency')) {
+                if ($complete && $autocreateInvoice){// && $this->_paid == round($order->getBaseGrandTotal(), 2) && !Mage::getStoreConfigFlag('msp/settings/allow_convert_currency')) {
                     $payment = $order->getPayment();
                     $payment->setTransactionId($mspDetails['ewallet']['id']);
                     $transaction = $payment->addTransaction('capture', null, false, $statusMessage);
@@ -530,13 +530,13 @@ class MultiSafepay_Msp_Model_Base extends Varien_Object {
                     $transaction->setIsClosed(1);
                     $transaction->setAdditionalInformation(Mage_Sales_Model_Order_Payment_Transaction::RAW_DETAILS, $transdetails);
                     $transaction->save();
-                    if(!Mage::getStoreConfigFlag('msp/settings/allow_convert_currency')){
+                    /*if(!Mage::getStoreConfigFlag('msp/settings/allow_convert_currency')){
                         $payment->setAmount($this->_paid);
                         $order->setTotalPaid($this->_paid);
                     }else{
                         $payment->setAmount($order->getGrandTotal());
                         $order->setTotalPaid($order->getGrandTotal());
-                    }
+                    }*/
                 }
             }
 

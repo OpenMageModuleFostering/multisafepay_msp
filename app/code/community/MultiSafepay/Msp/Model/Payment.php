@@ -261,8 +261,11 @@ class MultiSafepay_Msp_Model_Payment extends Varien_Object {
 
         $currentCurrencyCode = Mage::app()->getStore()->getCurrentCurrencyCode();
         $baseCurrencyCode = Mage::app()->getBaseCurrencyCode();
-
-        if ($canUseCurrentCurrency) {
+        
+		if($order->getGlobalCurrencyCode() == 'EUR' && Mage::getStoreConfigFlag('msp/settings/allow_convert_currency')){
+			$amount = $order_base_grand_total;
+            $currencyCode = 'EUR';
+		}elseif ($canUseCurrentCurrency) {
             $amount = $checked_amount_current;
             $currencyCode = $currentCurrencyCode;
         } elseif ($isAllowConvert) {
@@ -916,7 +919,10 @@ class MultiSafepay_Msp_Model_Payment extends Varien_Object {
 
         $canUseCurrentCurrency = in_array(Mage::app()->getStore()->getCurrentCurrencyCode(), $currencies);
 
-        if ($canUseCurrentCurrency) {
+        if($order->getGlobalCurrencyCode() == 'EUR' && Mage::getStoreConfigFlag('msp/settings/allow_convert_currency')){
+			$amount = $order_base_grand_total;
+            $currencyCode = 'EUR';
+		}elseif ($canUseCurrentCurrency) {
             $amount = $checked_amount_current;
             $currencyCode = Mage::app()->getStore()->getCurrentCurrencyCode();
         } elseif ($isAllowConvert) {

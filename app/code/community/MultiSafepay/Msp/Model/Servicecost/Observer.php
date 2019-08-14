@@ -71,6 +71,11 @@ class MultiSafepay_Msp_Model_Servicecost_Observer {
         $base_credit = $creditmemo->getBaseSubtotalInclTax() + $data['servicecost'] + $data['shipping_amount']  + $data['adjustment_positive'] - $data['adjustment_negative']+$creditmemo->getShippingTaxAmount();
         $credit = $creditmemo->getSubtotalInclTax() + $data['servicecost'] + $data['shipping_amount'] + $data['adjustment_positive'] - $data['adjustment_negative']+$creditmemo->getShippingTaxAmount();
         
+        if($data['servicecost'] >0){
+        	$tax= $creditmemo->getBaseTaxAmount()+ $order->getBaseServicecostTax(); 
+			$creditmemo->setTaxAmount($tax);
+			$creditmemo->setBaseTaxAmount($tax);
+        }
         
         
         $creditmemo->setGrandTotal($credit);
