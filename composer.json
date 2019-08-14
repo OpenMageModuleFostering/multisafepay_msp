@@ -1,0 +1,16 @@
+{
+    "name": "OpenMageModuleFostering/MultiSafepay_Msp",
+    "type": "magento-module",
+    "license": "AFL-3.0",
+    "homepage": "",
+    "description": "MultiSafepay module, add all paymentmethods by MultiSafepay",
+    "authors": [
+    {
+        "name": "MultiSafepay",
+        "email": "plugingroup@multisafepay.com"
+    }
+],
+    "suggest": {
+        "magento-hackathon/magento-composer-installer": "*"
+    }
+}
