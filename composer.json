@@ -1,5 +1,5 @@
 {
-    "name": "OpenMageModuleFostering\/MultiSafepay_Msp",
+    "name": "openmage-module-fostering\/multisafepay_msp",
     "type": "magento-module",
     "license": "AFL-3.0",
     "homepage": "",
